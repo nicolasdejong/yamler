@@ -1,0 +1,75 @@
+debug: false
+# line remark
+spring: // also line remark
+  security: /* block remark
+    is over multiple lines */
+    user:
+      name: test-user
+      password: test-password
+    dot.user:
+      name: dot-user
+      password: dot-password
+  list:
+    - a
+    - b
+    - c
+    - d
+    - e
+    - f
+    - d1: 1
+      d2: 2
+    - d1: 11
+      d2: 22
+management:
+  endpoints:
+    web:
+      exposure:
+        include: info, health, metrics
+  endpoint:
+    health:
+      show-details: never
+health:
+  config:
+    enabled: false
+info:
+  app:
+    name: @project.artifactId@-@version@
+    description: @project.description@
+  build:
+    groupId: @project.groupId@
+    artifact: @project.artifactId@
+    name: @project.name@
+    version: @version@
+logging:
+  level:
+    test.jsonio: DEBUG
+    test.jsonio.service: INFO
+    test.jsonio.service.SomeClass: WARN
+threadpool:
+  storeSubmission:
+    coreSize: 30
+    metrics:
+      rollingStats:
+        timeInMilliseconds: 180000
+app:
+  jws:
+    edge-router:
+      connect-timeout: 400
+      read-timeout: 1000
+      maxClockSkew: PT3S
+  config:
+    general:
+      gen1: 1
+      gen2: 2
+      pattern: /jsonio/**
+      pattern2: /jsonio/service/**
+    some-app:
+      twoWaySsl: true
+      keystore: classpath:local-app-keystore.jks
+      truststore: classpath:local-app-truststore.jks
+    other-app:
+      enabled: true
+    some-service:
+      #      basePath: https://some-url.net/foobar
+      basePath: https://127.0.0.1:2345/
+      trackRequests: true

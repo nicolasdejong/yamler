@@ -1,0 +1,6 @@
+// class or package name to level.
+logging:
+  level:
+    root: INFO
+    classfactory: WARN
+    nl.rutilo.gimme: ERROR

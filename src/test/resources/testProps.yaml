@@ -1,0 +1,6 @@
+foo: 1
+bar: 2
+base:
+  num: 123
+  string: abc
+  stringList: [a, b, c, d]

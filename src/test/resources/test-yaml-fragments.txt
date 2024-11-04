@@ -1,0 +1,2908 @@
+This file contains sections of {[Config,] YAML, JSON} tuples all separated by a 4x@ characters.
+The tuple is separated by 4x~ characters. Any tuple that is not a 2- or 3-tuple is ignored (like this text).
+'·' characters will be replaced by a space, '→' replaced by tab.
+
+The YAML will be read and converted to JSON after which it is compared against the JSON part of the tuple.
+
+This file is loaded and validated by the unit-tests to check if the YAML reader is correctly implemented.
+
+The JSON is validated by the unit-test directly as code so is assumed to be correct when validating the YAML.
+
+
+Each block is separated by 4x ~ followed by type (newline or y: YAML, t=TOKENS, c=CONFIGURATION)
+except the first block which is always the yaml input.
+
+Sections between ----- title ----- can be collapsed (but IntelliJ only remembers that for local files)
+
+Example:
+
+# YAML data as input
+foo: bar
+~~~~y
+# output should be equal to the (parsed) following
+{"foo":"bar"}
+~~~~t
+TEXT|foo; KV_SEPARATOR; TEXT|bar
+~~~~c
+# configuration can be added here (yaml)
+
+@@@@
+
+
+---------- Fundamentals -----------
+@@@@ # list basic
+- a
+- b
+- c
+~~~~
+["a","b","c"]
+
+@@@@ # list nested (not valid yaml)
+- a
+- - b1
+  - b2
+- c
+@@~~
+["a",["b1","b2"],"c"]
+
+@@@@ # list nested
+- a
+-
+  - b1
+  - b2
+- c
+~~~~
+["a",["b1","b2"],"c"]
+
+@@@@ # list empty item
+- a
+-
+- c
+~~~~
+["a",null,"c"]
+
+@@@@ # list empty items
+- a
+-
+-  # empty
+-
+- e
+~~~~
+["a",null,null,null,"e"]
+
+@@@@ # map basic
+a: 1
+b: 2
+c: 3
+~~~~
+{"a":1,"b":2,"c":3}
+
+@@@@ # map nested (not valid Yaml)
+a: 1
+b: b1: 11
+   b2: 22
+c: 3
+@@@@~~
+{"a":1,"b":{"b1":11,"b2":22},"c":3}
+
+@@@@ # map nested
+a: 1
+b:
+   b1: 11
+   b2: 22
+c: 3
+~~~~
+{"a":1,"b":{"b1":11,"b2":22},"c":3}
+
+
+@@@@ # map empty key
+a: 1
+: 2
+c: 3
+~~~~y
+{"a":1,null:2,"c":3}
+
+@@@@ # map empty value
+a: 1
+b:
+c: 3
+~~~~
+{"a":1,"b":null,"c":3}
+
+@@@@ # map empty values
+a: 1
+b: # empty value
+c: # empty value
+d: # empty value
+e: 3
+~~~~
+{"a":1,"b":null,"c":null,"d":null,"e":3}
+
+@@@@ # map empty key and empty value
+a: 1
+:
+c: 3
+~~~~
+{"a":1,null:null,"c":3}
+
+@@@@ (not valid yaml)
+- a
+- b
+- - aa
+  - bb
+  -
+    - aaa
+    - bbb
+  - cc
+  - - aaaa
+    - bbbb
+- c
+@@~~
+["a","b",["aa","bb",["aaa","bbb"],"cc",["aaaa","bbbb"]],"c"]
+
+@@@@
+- a
+- b
+-
+  - aa
+  - bb
+  -
+    - aaa
+    - bbb
+  - cc
+  -
+    - aaaa
+    - bbbb
+- c
+~~~~
+["a","b",["aa","bb",["aaa","bbb"],"cc",["aaaa","bbbb"]],"c"]
+
+@@@@
+a : 1
+[1,2] : [3,4,5]
+~~~~y
+{"a":1,[1,2]:[3,4,5]}
+
+@@@@
+a : 1
+b : 2
+c : 3
+
+@@@@
+a : 1
+b : - aa
+    - bb
+c: 3
+
+@@@@
+ - a
+ - b
+ - - aa
+   - bb
+ - c
+ - aa : 1
+   bb : 2
+   cc :
+    - cc1
+    - cc2
+   dd : 4
+ - d
+@@@@
+
+@@@@
+  list:
+    - a
+    - b
+    - c1: 1
+      c2: 2
+    - d1: 11
+      d2: 22
+  plain: newlines
+   will be
+    removed
+  plain2:
+   newlines will be removed
+   here as well
+~~~~
+{"list":["a","b",{"c1":1,"c2":2},{"d1":11,"d2":22}],
+ "plain":"newlines will be removed", "plain2":"newlines will be removed here as well"}
+@@@@
+
+foo: false
+bar:
+  a: 123
+  b: 0xFF
+~~~~
+{"foo":false,"bar":{"a":123,"b":255}}
+@@@@
+
+foo: false
+{key1: 1, key2: 2}:
+  a: 123
+  {key1: 5,key2: 6}: 0xFF
+~~~~
+{"foo":false,{"key1":1,"key2":2}:{"a":123,{"key1":5,"key2":6}:255}}
+@@@@
+
+@@@@ # comma outside flow collection is part of scalar
+foo : bar,
+a : 1
+~~~~
+{"foo":"bar,","a":1}
+
+@@@@ # comma inside flow collection is NOT part of scalar
+{foo : bar,
+a : 1}
+~~~~
+{"foo":"bar","a":1}
+@@@@
+
+---------- YAML errors ----------
+@@@@ (skipped)
+foo: false
+bar:
+  a: 123
+   b: 0xFF
+  c: 567
+@~~~
+{"error":"Illegal map indent on line 4:\n   b: 0xFF\n    ^"}
+@@@@
+foo: false
+bar:
+  a: 123
+ b: 0xFF
+  c: 567
+~~~~
+{"error":"Illegal map indent (1 > 0) on line 4:\n b: 0xFF\n  ^"}
+@@@@ (skipped)
+- a
+ - b
+- c
+@~~~
+{"error":"Illegal list indent on line 2:\n - b\n  ^"}
+@@@@
+  - a
+ - b
+  - c
+~~~~
+{"error":"Illegal token: LIST_ITEM on line 2:\n - b\n  ^"}
+@@@@
+  - a
+ - b
+ - c
+~~~~
+{"error":"Illegal token: LIST_ITEM on line 2:\n - b\n  ^"}
+
+@@@@ # errors: map key in list
+- a
+- b
+c : 3
+~~~~
+error: "Illegal token: SCALAR on line 4:\nc : 3\n  ^"
+
+@@@@
+
+---------- basic scalars ----------
+@@@@ a: 1         ~~~~ {"a":1}
+@@@@ a: 1 # remark~~~~ {"a":1}
+@@@@ a:   1       ~~~~ {"a":1}
+@@@@ a: 1 2       ~~~~ {"a":"1 2"}
+@@@@ a: abc       ~~~~ {"a":"abc"}
+@@@@ a: true      ~~~~ {"a":true}
+@@@@ a: truth     ~~~~ {"a":"truth"}
+@@@@ a: false     ~~~~ {"a":false}
+@@@@ a: true false~~~~ {"a":"true false"}
+@@@@ a: "true"    ~~~~ {"a":"true"}
+@@@@ a: null      ~--- {"a":null}
+@@@@ a: undefined ~--- {"a":null}
+@@@@ a: .inf      ~~~~ {"a":.inf}
+@@@@ a: -.inf     ~~~~ {"a":-.inf}
+@@@@ a: .NaN      ~~~~ {"a":.NaN}
+@@@@ a: .NaNo     ~~~~ {"a":".NaNo"}
+@@@@
+debug: false
+spring:
+  a: 123
+  b: 0xFF
+~~~~
+{"debug":false,"spring":{"a":123,"b":255}}
+@@@@
+
+---------- single quotes ----------
+@@@@`abc def`    ~~~~ "abc def"
+@@@@'abc ''def'''~~~~ "abc 'def'"
+@@@@`abc,def`    ~~~~ "abc,def"
+@@@@
+
+---------- YAML string blocks: basic unquoted --------------
+@@@@
+abc def
+~~~~
+"abc def"
+
+@@@@
+/jsonio/**
+~~~~
+"/jsonio/**"
+
+@@@@
+a:
+  some text # with remark
+~~~~
+{"a":"some text"}
+
+@@@@
+a:
+  some text#no remark
+~~~~
+{"a":"some text#no remark"}
+
+@@@@
+a: aaa
+b: bbb
+~~~~
+{"a":"aaa","b":"bbb"}
+
+@@@@
+a:
+  abc
+  def
+
+  ghi
+  jkl
+~~~~
+{"a":"abc def\nghi jkl"}
+
+@@@@
+a:
+  a1
+  a2
+
+  a3
+
+
+  a4
+  a5
+b: bbb
+c: ccc
+   ccc
+d:
+   ddd
+    ddd
+e: ee
+~~~~
+{"a":"a1 a2\na3\n\na4 a5","b":"bbb","c":"ccc ccc","d":"ddd ddd","e":"ee"}
+
+@@@@
+a: aval
+b: true text
+c: [1, 2, abc, 4]
+d: [12, "12", true, "true", false, "false", undefined, "undefined", null, "null"]
+~~~~
+{"a":"aval","b":"true text","c":[1,2,"abc",4],"d":[12,"12",true,"true",false,"false",null,"undefined",null,"null"]}
+
+@@@@
+
+
+---------- YAML string blocks: LITERAL --------------
+@@@@
+|
+
+
+ literal
+
+
+ text
+
+# Comment
+~~~~
+"\n\nliteral\n\n\ntext\n"
+
+@@@@
+|
+·
+··
+ literal
+··
+·
+ text
+·
+# Comment
+~~~~
+"\n \nliteral\n \n\ntext\n"
+
+@@@@
+|
+  'abc'
+  def
+  ghi
+~~~~
+"'abc'\ndef\nghi\n"
+
+@@@@
+{val: |
+  'abc'
+  def
+
+
+
+  ghi
+
+foo: bar}
+~~~~
+{"val":"'abc'\ndef\n\n\n\nghi\n","foo":"bar"}
+
+@@@@
+{val: |-
+  'abc'
+  def
+
+
+
+  ghij
+foo: bar}
+~~~~
+{"val":"'abc'\ndef\n\n\n\nghij","foo":"bar"}
+
+@@@@
+{val: |+
+  'abc'
+  def
+
+
+
+  ghijk
+
+foo: bar}
+~~~~
+{"val":"'abc'\ndef\n\n\n\nghijk\n\n","foo":"bar"}
+
+@@@@
+val: |
+··
+··
+foo: bar
+~~~~
+{"val":"\n","foo":"bar"}
+
+@@@@
+val: |
+
+
+foo: bar
+~~~~
+{"val":"\n","foo":"bar"}
+
+@@@@
+val: |-
+
+
+foo: bar
+~~~~
+{"val":"","foo":"bar"}
+
+@@@@
+val: |+
+
+
+foo: bar
+~~~~
+{"val":"\n\n","foo":"bar"}
+
+@@@@
+val: |-
+··
+··
+foo: bar
+~~~~
+{"val":"","foo":"bar"}
+
+@@@@
+val: |+
+··
+··
+foo: bar
+~~~~
+{"val":"\n\n","foo":"bar"}
+
+@@@@
+
+---------- YAML string blocks: FOLDING --------------
+@@@@
+{val: >
+  folded
+  line
+
+  next
+  line
+    * bullit
+
+    * list
+    * lines
+
+  last
+  line
+
+# comment
+}
+~~~~
+{"val":"folded line\nnext line\n  * bullit\n\n  * list\n  * lines\n\nlast line\n"}
+
+@@@@
+{val: >
+  'abc'
+  def
+
+
+
+  ghi
+
+foo: bar}
+~~~~
+{"val":"'abc' def\n\n\nghi\n","foo":"bar"}
+
+@@@@
+{val: >-
+  'abc'
+  def
+
+
+
+  ghi
+
+foo: bar}
+~~~~
+{"val":"'abc' def\n\n\nghi","foo":"bar"}
+
+@@@@
+{val: >+
+  'abc'
+  def
+
+
+
+  ghi
+
+foo: bar}
+~~~~
+{"val":"'abc' def\n\n\nghi\n\n","foo":"bar"}
+
+@@@@
+
+
+---------- YAML strings that look like blocks but are not  --------------
+@@@@
+|not a block
+~~~~
+"|not a block"
+
+@@@@
+val: | some text here
+foo bar: 123
+~~~~
+{"val":"| some text here","foo bar":123}
+
+@@@@
+
+---------- YAML Lists ----------
+@@@@
+list:
+  - a
+  - b
+  - c
+~~~~
+{`list`:[`a`,`b`,`c`]}
+
+@@@@
+list:
+  - {a: 1, aa: 11}
+  - {b: 2, bb: 22}
+  - {c: 3, cc: 33}
+~~~~
+{`list`:[{`a`:1,`aa`:11},{`b`:2,`bb`:22},{`c`:3,`cc`:33}]}
+
+@@@@
+list:
+  -
+    a: 1
+    aa: 11
+  -
+    b: 2
+    bb: 22
+  -
+    c: 3
+    cc: 33
+~~~~
+{`list`:[{`a`:1,`aa`:11},{`b`:2,`bb`:22},{`c`:3,`cc`:33}]}
+
+@@@@
+
+---------- YAML Maps ----------
+@@@@
+list:
+- a: 1
+- b: 2
+- c: 3
+~~~~
+{`list`:[{`a`:1},{`b`:2},{`c`:3}]}
+
+@@@@
+list:
+ - a: 1
+ - b: 2
+ - c: 3
+~~~~
+{`list`:[{`a`:1},{`b`:2},{`c`:3}]}
+
+@@@@
+list:
+  - a: 1
+  -   b: 2
+  - c: 3
+~~~~
+{`list`:[{`a`:1},{`b`:2},{`c`:3}]}
+
+@@@@
+list:
+- a: 1
+ - b: 2
+- c: 3
+~~~~
+{"error" : "Illegal list indent (1 > 0) on line 3:\n - b: 2\n  ^"}
+@@@@
+{"list":[{"a":{"1 - b":2}},{"c":3}]}
+
+@@@@
+list:
+- a: 1
+   - b: 2
+- c: 3
+~~~~
+{"error" : "Illegal map indent (3 > 2) on line 3:\n   - b: 2\n    ^"}
+@@@@
+{"list":[{"a":{"1 - b":2}},{"c":3}]}
+
+@@@@
+map:
+- a:
+- b: 2
+- c: 3
+~~~~
+{"map":[{"a":null},{"b":2},{"c":3}]}
+
+@@@@
+map:
+- a:
+  - b: 2
+- c: 3
+~~~~
+{"map":[{"a":[{"b":2}]},{"c":3}]}
+
+@@@@
+map:
+- a:
+ - b: 2
+- c: 3
+~~~~
+{"error":"Illegal list indent (1 > 0) on line 3:\n - b: 2\n  ^"}
+
+@@@@
+map:
+- a:
+  - b: 2
+- c: 3
+~~~~
+{`map`:[{`a`:[{`b`:2}]},{`c`:3}]}
+
+@@@@
+map:
+  - a: 1
+  - b: 2
+  - c: 3
+~~~~
+{`map`:[{`a`:1},{`b`:2},{`c`:3}]}
+
+@@@@
+map:
+  - a:
+    - aa: 1
+    - ab: 2
+  - b:
+    - 1
+    - 2
+    - 3
+  - c: 4
+~~~~
+{`map`:[{`a`:[{`aa`:1},{`ab`:2}]},{`b`:[1,2,3]},{`c`:4}]}
+
+@@@@
+rates:
+- 391:
+    mul: 10000
+    store: 5000
+- 392:
+    mul: 9000
+    store: 5000
+~~~~
+{`rates`:[{391: {`mul`:10000,`store`:5000}},{392: {`mul`:9000,`store`:5000}}]}
+
+@@@@
+a:
+  a1:
+    a11: 11
+    a12: 12
+  a2:
+      a21: 21
+      a22: 22
+~~~~
+{`a`:{`a1`:{`a11`:11,`a12`:12},`a2`:{`a21`:21,`a22`:22}}}
+
+@@@@
+a:
+  a1:
+    a11: 11
+    a12: 12
+  a2:
+        a21: 21
+        a22: 22
+~~~~
+{`a`:{`a1`:{`a11`:11,`a12`:12},`a2`:{`a21`:21,`a22`:22}}}
+
+@@@@
+map:
+ 1: a
+ 2: b
+ 3: c
+~~~~
+{`map`:{1: `a`,2: `b`,3: `c`}}
+
+@@@@
+
+# key without value
+{a: 1,b: 2,c,{d: 3}}
+~~~~
+{"a":1,"b":2,"c":null,{"d":3}:null}
+
+@@@@
+{map: {
+  a: 1
+  b: 2
+  c: 3
+}
+~~~~
+{"error":"Unterminated map on line 6:\n\n^"}
+@@@@
+
+# mix of flow & non-flow lists and maps
+map:
+ 1: [ aa: 11, bb:
+                bba: 1
+                bbb: 2
+                bbc: 3, cc: 22 ]
+ 2: b
+ 3:
+   - a3
+   - [ b1,
+           - b2a
+           - b2b
+           - b2c, b3 ]
+   - c3
+ 4: c
+~~~~
+{"map":{
+1: [{"aa":11},{"bb":{"bba":1,"bbb":2,"bbc":3}},{"cc":22}],
+2: "b",
+3: ["a3",["b1",["b2a","b2b","b2c"],"b3"],"c3"],
+4: "c"
+}}
+@@@@
+
+{"map":{1: [{"aa":11},{"bb":{"bba":1,"bbb":2,"bbc":3}},{"cc":22}],2: "b",3: ["a3",["b1",["b2a","b2b","b2c"],"b3"],"c3"],4: "c"}}
+~~~~
+{"map":{
+1: [{"aa":11},{"bb":{"bba":1,"bbb":2,"bbc":3}},{"cc":22}],
+2: "b",
+3: ["a3",["b1",["b2a","b2b","b2c"],"b3"],"c3"],
+4: "c"
+}}
+
+@@@@
+
+---------- Empty values ----------
+@@@@
+a:
+  ab:
+b: 3
+~~~~
+{"a":{"ab":null},"b":3}
+
+@@@@
+a:
+  ab:
+  ac:
+  ad:
+b: 3
+~~~~
+{"a":{"ab":null,"ac":null,"ad":null},"b":3}
+
+@@@@
+a:
+b: 3
+~~~~
+{"a":null,"b":3}
+
+@@@@
+list:
+ - a:
+ - b:
+ - c: 3
+~~~~
+{"list":[{"a":null},{"b":null},{"c":3}]}
+
+@@@@
+a:
+  ab:
+b: 3
+~~~~
+{"a":{"ab":null},"b":3}
+
+@@@@
+a:
+  ab:
+  ac:
+  ad:
+b: 3
+~~~~
+{"a":{"ab":null,"ac":null,"ad":null},"b":3}
+@@@@
+
+---------- YAML Single line ----------
+@@@@
+{a: aa,b: bb}
+~~~~
+{`a`:`aa`,`b`:`bb`}
+
+@@@@
+
+---------- YAML multiple documents ----------
+@@@@
+a1: 1
+b1: 2
+~~~~
+{`a1`:1,`b1`:2}
+
+@@@@
+---
+a1: 1
+b1: 2
+~~~~
+{`a1`:1,`b1`:2}
+
+@@@@
+---
+a1: 1
+b1: 2
+---
+~~~~
+{`a1`:1,`b1`:2}
+
+@@@@
+- a
+- b
+- c
+---
+a1: 1
+b1: 2
+...
+---
+a2: 1
+b2: 2
+...
+---
+a3: 1
+b3: 2
+--- >-
+  first line
+  second line
+---~~~~
+[
+  [`a`,`b`,`c`],
+  {`a1`:1,`b1`:2},
+  {`a2`:1,`b2`:2},
+  {`a3`:1,`b3`:2},
+  `first line second line`
+]
+
+@@@@
+
+
+---------- YAML reference values ----------
+@@@@
+a: aVal
+b: &bRef bVal
+c: &cRef
+  - cItem1
+  - cItem2
+  - cItem3
+d: &dRef
+  da: daVal
+  db: dbVal
+  dc: dcVal
+e: eVal
+rb: *bRef
+rc: *cRef
+rd: *dRef
+~~~~
+{"a":"aVal","b":"bVal","c":["cItem1","cItem2","cItem3"],"d":{"da":"daVal","db":"dbVal","dc":"dcVal"},"e":"eVal",
+ "rb":"bVal","rc":["cItem1","cItem2","cItem3"],"rd":{"da":"daVal","db":"dbVal","dc":"dcVal"}}
+@@@@
+
+---------- JSON whitespaces should be ignored (unlike YAML) ----------
+@@@@
+{   "a":
+ "aVal", "b"   :
+ "bVal", "c": [
+ "cItem1", "cItem2",
+ "cItem3"], "d"
+ :
+ "text\nabc"
+,
+"e": "real
+newline in json"}
+~~~~
+{"a":"aVal","b":"bVal","c":["cItem1","cItem2","cItem3"],"d":"text\nabc","e":"real newline in json"}
+@@@@
+
+
+---------- YAML empty keys and values ----------
+@@@@ # Empty keys or values
+foo : °
+° : bar
+list:
+- a
+-°
+- c
+-°
+- d
+list2:
+-°
+- b
+flowMap : {
+  foo : °,
+  ° : bar,
+  list:
+    - a
+    -°
+    - c
+    -°
+    - d,
+  list2:
+    -°
+    - b
+}
+~~~~
+{
+           "foo":null,null:"bar","list":["a",null,"c",null,"d"],"list2":[null,"b"],
+"flowMap":{"foo":null,null:"bar","list":["a",null,"c",null,"d"],"list2":[null,"b"]}
+}
+
+@@@@ # Empty keys or values (with string tags) (ADAPTED: tags with null values)
+foo : !!str null
+!!str null : bar
+list:
+- a
+- !!str null
+- c
+- !!str null
+- d
+list2:
+- !!str null
+- b
+flowMap : {
+  foo : !!str null,
+  !!str null : bar,
+  list:
+    - a
+    - !!str null
+    - c
+    - !!str null
+    - d,
+  list2:
+    - !!str null
+    - b
+}
+~~~~
+{
+            "foo":"","":"bar","list":["a","","c","","d"],"list2":["","b",],
+"flowMap": {"foo":"","":"bar","list":["a","","c","","d"],"list2":["","b"]}
+}
+
+@@@@
+
+---------- YAML various cases ----------
+@@@@
+1st non-empty
+
+ 2nd non-empty
+ 3rd non-empty
+~~~~
+"1st non-empty\n2nd non-empty 3rd non-empty"
+
+@@@@
+a: 1st non-empty
+
+   2nd non-empty
+   3rd non-empty
+~~~~
+{"a":"1st non-empty\n2nd non-empty 3rd non-empty"}
+
+@@@@
+a: text:with:colon
+
+   more:text:with:colon
+~~~~
+{"a":"text:with:colon\nmore:text:with:colon"}
+
+@@@@
+jsonMap: { a: aVal,b: bVal }
+jsonList: [ a,b,c,d ]
+yamlMap:
+  a: aVal,rest
+  b: bVal,rest
+yamlList:
+  - a,a
+  - b,b
+  - c,c
+  - d,d
+~~~~
+{"jsonMap":{"a":"aVal","b":"bVal"},"jsonList":["a","b","c","d"],
+ "yamlMap":{"a":"aVal,rest","b":"bVal,rest"},"yamlList":["a,a","b,b","c,c","d,d"]
+}
+
+@@@@
+a:
+  b: bVal
+  c:
+    d: dVal
+    e: eVal
+    f:
+      g: gVal
+      h:
+i: iVal
+j:
+  k: kVal
+  l: lVal
+m: mVal
+~~~~
+{"a":{"b":"bVal","c":{"d":"dVal","e":"eVal","f":{"g":"gVal","h":null}}},"i":"iVal","j":{"k":"kVal","l":"lVal"},"m":"mVal"}
+@@@@
+
+%YAML 1.2
+---
+!!str "\n\
+      folded line\n\
+      next line\n\
+      \  * bullet\n
+      \n\
+      \  * list\n\
+      \  * lines\n\
+      \n\
+      last line\n"
+~~~~
+"\nfolded line\nnext line\n  * bullet\n\n  * list\n  * lines\n\nlast line\n"
+@@@@
+
+
+
+
+
+---------- YAML various example documents ----------
+@@@@
+debug: false
+# line remark
+spring: # also line remark
+  security: /* block remark
+    is over multiple lines */
+    user:
+      name: test-user
+      password: test-password
+    dot.user:
+      name: dot-user
+      password: dot-password
+  list:
+    - a
+    - b
+    - c
+    - d
+    - e
+    - f
+    - d1: 1
+      d2: 2
+    - d1: 11
+      d2: 22
+management:
+  endpoints:
+    web:
+      exposure:
+        include: info, health, metrics
+  endpoint:
+    health:
+      show-details: never
+health:
+  config:
+    enabled: false
+info:
+  app:
+    name: @project.artifactId@-@version@
+    description: @project.description@
+  build:
+    groupId: @project.groupId@
+    artifact: @project.artifactId@
+    name: @project.name@
+    version: @version@
+logging:
+  level:
+    test.jsonio: DEBUG
+    test.jsonio.service: INFO
+    test.jsonio.service.SomeClass: WARN
+threadpool:
+  storeSubmission:
+    coreSize: 30
+    metrics:
+      rollingStats:
+        timeInMilliseconds: 180000
+app:
+  jws:
+    edge-router:
+      connect-timeout: 400
+      read-timeout: 1000
+      maxClockSkew: PT3S
+  config:
+    general:
+      gen1: 1
+      gen2: 2
+      pattern: /jsonio/**
+      pattern2: /jsonio/service/**
+    some-app:
+      twoWaySsl: true
+      keystore: classpath:local-app-keystore.jks
+      truststore: classpath:local-app-truststore.jks
+    other-app:
+      enabled: true
+    some-service:
+      #      basePath: https://some-url.net/foobar
+      basePath: https://127.0.0.1:2345/
+      trackRequests: true
+~~~~
+{ "debug":false,
+  "spring":{
+    "security":{
+      "user":{"name":"test-user","password":"test-password"},
+      "dot.user":{"name":"dot-user","password":"dot-password"}
+    },
+    "list":["a","b","c","d","e","f",{"d1":1,"d2":2},{"d1":11,"d2":22}]
+  },
+  "management":{
+    "endpoints":{
+      "web":{
+        "exposure":{
+          "include": "info, health, metrics"
+        }
+      }
+    },
+    "endpoint":{
+      "health":{"show-details": never}
+    }
+  }
+  "health":{
+    "config":{
+      "enabled": false
+    }
+  }
+  "info":{
+    "app":{"name": "@project.artifactId@-@version@", "description": "@project.description@"}
+    "build":{
+      "groupId": "@project.groupId@",
+      "artifact": "@project.artifactId@",
+      "name": "@project.name@",
+      "version": "@version@",
+    }
+  }
+  "logging":{
+    "level":{
+      "test.jsonio": "DEBUG",
+      "test.jsonio.service": "INFO",
+      "test.jsonio.service.SomeClass": "WARN"
+    }
+  }
+  "threadpool":{"storeSubmission":{
+    "coreSize": 30,
+    "metrics":{"rollingStats":{"timeInMilliseconds": 180000}}
+  }}
+  "app":{
+    "jws":{
+      "edge-router":{
+        "connect-timeout": 400,
+        "read-timeout": 1000,
+        "maxClockSkew": "PT3S",
+      }
+    }
+    "config":{
+      "general":{
+        "gen1": 1,
+        "gen2": 2,
+        "pattern": "/jsonio/**",
+        "pattern2": "/jsonio/service/**"
+      }
+      "some-app":{
+        "twoWaySsl": true,
+        "keystore": "classpath:local-app-keystore.jks",
+        "truststore": "classpath:local-app-truststore.jks"
+      }
+      "other-app":{
+        "enabled": true
+      }
+      "some-service":{
+        "basePath": "https://127.0.0.1:2345/",
+        "trackRequests": true
+      }
+    }
+  }
+}
+@@@@
+Example TODO:
+
+  TODO 1: >
+    Some multiline
+    text
+  TODO 2:
+    something with codesample 1: |
+      /* line up blog items in My Programme page */
+      #blog-column .grid {
+          margin-left: -15px;
+          margin-right: -15px;
+      }
+
+  TODO 3:
+    # some comment out stuff
+
+  TODO 4 folded:
+    Some other text
+    bla bla
+~~~~
+{"Example TODO":{
+  "TODO 1":"Some multiline text\n",
+  "TODO 2":{"something with codesample 1":"/* line up blog items in My Programme page */\n#blog-column .grid {\n    margin-left: -15px;\n    margin-right: -15px;\n}\n"},
+  "TODO 3":null,
+  "TODO 4 folded":"Some other text bla bla"
+}}
+@@@@
+
+
+---------- YAML-Spec examples ----------
+
+
+---------- YAML-Spec Chapter 2: Overview ---------
+@@@@ # YAML-Spec examples 2.1 Sequence of Scalars
+- Mark McGwire
+- Sammy Sosa
+- Ken Griffey
+~~~~
+["Mark McGwire","Sammy Sosa","Ken Griffey"]
+
+
+@@@@ # YAML-Spec examples 2.2 Mapping of Scalars to Scalars
+hr:  65    # Home runs
+avg: 0.278 # Batting average
+rbi: 147   # Runs Batted In
+~~~~
+{"hr":65,"avg":0.278,"rbi":147}
+
+
+@@@@ # YAML-Spec examples 2.3 Mapping of Scalars to Sequences
+american:
+  - Boston Red Sox
+  - Detroit Tigers
+  - New York Yankees
+national:
+  - New York Mets
+  - Chicago Cubs
+  - Atlanta Braves
+~~~~
+{"american":["Boston Red Sox","Detroit Tigers","New York Yankees"],
+ "national":["New York Mets","Chicago Cubs","Atlanta Braves"]}
+
+
+@@@@ # YAML-Spec examples 2.4 Sequence of Mappings
+-
+  name: Mark McGwire
+  hr:   65
+  avg:  0.278
+-
+  name: Sammy Sosa
+  hr:   63
+  avg:  0.288
+~~~~
+[{"name":"Mark McGwire","hr":65,"avg":0.278},{"name":"Sammy Sosa","hr":63,"avg":0.288}]
+
+
+@@@@ # YAML-Spec examples 2.5 Sequence of Sequences
+- [name        , hr, avg  ]
+- [Mark McGwire, 65, 0.278]
+- [Sammy Sosa  , 63, 0.288]
+~~~~
+[["name","hr","avg"],["Mark McGwire",65,0.278],["Sammy Sosa",63,0.288]]
+
+
+@@@@ # YAML-Spec examples 2.6 Mapping of Mappings
+Mark McGwire: {hr: 65, avg: 0.278}
+Sammy Sosa: {
+    hr: 63,
+    avg: 0.288
+  }
+~~~~
+{"Mark McGwire":{"hr":65,"avg":0.278},"Sammy Sosa":{"hr":63,"avg":0.288}}
+
+
+@@@@ # YAML-Spec examples 2.7 Two Documents in a Stream
+# Ranking of 1998 home runs
+---
+- Mark McGwire
+- Sammy Sosa
+- Ken Griffey
+
+# Team ranking
+---
+- Chicago Cubs
+- St Louis Cardinals
+~~~~
+[["Mark McGwire","Sammy Sosa","Ken Griffey"],["Chicago Cubs","St Louis Cardinals"]]
+
+
+@@@@ # YAML-Spec examples 2.8 Play by Play Feed
+---
+time: 20:03:20
+player: Sammy Sosa
+action: strike (miss)
+...
+---
+time: 20:03:47
+player: Sammy Sosa
+action: grand slam
+...
+~~~~
+[
+{"time":"20:03:20","player":"Sammy Sosa","action":"strike (miss)"},
+{"time":"20:03:47","player":"Sammy Sosa","action":"grand slam"}
+]
+
+
+@@@@ # YAML-Spec examples 2.9 Single Document with Two Comments
+---
+hr: # 1998 hr ranking
+  - Mark McGwire
+  - Sammy Sosa
+rbi:
+  # 1998 rbi ranking
+  - Sammy Sosa
+  - Ken Griffey
+~~~~
+{"hr":["Mark McGwire","Sammy Sosa"],"rbi":["Sammy Sosa","Ken Griffey"]}
+
+
+@@@@ # YAML-Spec examples 2.10 Node for "Sammy Sosa" appears twice in this document
+---
+hr:
+  - Mark McGwire
+  # Following node labeled SS
+  - &SS Sammy Sosa
+rbi:
+  - *SS # Subsequent occurrence
+  - Ken Griffey
+~~~~
+{"hr":["Mark McGwire","Sammy Sosa"],"rbi":["Sammy Sosa","Ken Griffey"]}
+
+@@@@ # YAML-Spec examples 2.11 Mapping between sequences <--- non-string keys not supported by this implementation
+
+@@@@ # YAML-Spec examples 2.12 Compact Nested Mapping
+---
+# Products purchased
+- item    : Super Hoop
+  quantity: 1
+- item    : Basketball
+  quantity: 4
+- item    : Big Shoes
+  quantity: 1
+~~~~
+[{"item":"Super Hoop","quantity":1},{"item":"Basketball","quantity":4},{"item":"Big Shoes","quantity":1}]
+
+@@@@ # YAML-Spec examples 2.13 In literals, newlines are preserved
+# ASCII Art
+--- |
+  \//||\/||
+  // ||  ||__
+~~~~
+"\\//||\\/||\n// ||  ||__\n"
+
+@@@@ # YAML-Spec examples 2.14 In the folded scalars, newlines become spaces
+--- >
+  Mark McGwire's
+  year was crippled
+  by a knee injury.
+~~~~
+"Mark McGwire's year was crippled by a knee injury.\n"
+
+@@@@ # YAML-Spec examples 2.15 Folded newlines are preserved for "more indented" and blank lines
+>
+ Sammy Sosa completed another
+ fine season with great stats.
+
+   63 Home Runs
+   0.288 Batting Average
+
+ What a year!
+~~~~
+"Sammy Sosa completed another fine season with great stats.\n\n  63 Home Runs\n  0.288 Batting Average\n\nWhat a year!\n"
+
+
+@@@@ # YAML-Spec examples 2.16 Indentation determines scope
+name: Mark McGwire
+accomplishment: >
+  Mark set a major league
+  home run record in 1998.
+stats: |
+  65 Home Runs
+  0.278 Batting Average
+~~~~
+{"name":"Mark McGwire",
+ "accomplishment":"Mark set a major league home run record in 1998.\n",
+ "stats":"65 Home Runs\n0.278 Batting Average\n"
+}
+
+
+@@@@ # YAML-Spec examples 2.17 Quoted Scalars
+unicode: "Sosa did fine.\u263A"
+control: "\b1998\t1999\t2000\n"
+hex esc: "\x0d\x0a is \r\n"
+
+single: '"Howdy!" he cried.'
+quoted: ' # Not a ''comment''.'
+tie-fighter: '|\-*-/|'
+~~~~
+{"unicode":"Sosa did fine.\u263A",
+ "control": "\b1998\t1999\t2000\n",
+ "hex esc": "\x0d\x0a is \r\n",
+ "single": "\"Howdy!\" he cried.",
+ "quoted": " # Not a 'comment'.",
+ "tie-fighter": "|\\-*-/|"
+}
+
+@@@@ # YAML-Spec examples 2.18 Multi-line Flow Scalars
+plain:
+  This unquoted scalar
+  spans many lines.
+
+quoted: "So does this
+quoted scalar.\n"
+~~~~
+{"plain":"This unquoted scalar spans many lines.",
+ "quoted": "So does this quoted scalar.\n"
+}
+
+@@@@ # YAML-Spec examples 2.19 Integers
+canonical: 12345
+decimal: +12345
+octal: 0o14
+hexadecimal: 0xC
+~~~~
+{"canonical":12345,"decimal":12345,"octal":0o14,"hexadecimal":0xC}
+
+@@@@ # YAML-Spec examples 2.20 Floating Points
+canonical: 1.23015e+3
+exponential: 12.3015e+02
+fixed: 1230.15
+negative infinity: -.inf
+not a number: .NaN
+~~~~
+{"canonical":1.23015e+3,"exponential":12.3015e+02,"fixed":1230.15,"negative infinity":-.inf,"not a number":.NaN}
+
+@@@@ # YAML-Spec examples 2.21 Miscellaneous
+null:
+booleans: [ true, false ]
+true: true
+false: false
+undefined: undefined
+string: '012345'
+~~~~
+{null:null,"booleans":[true,false],true:true,false:false,"string":"012345"}
+
+
+@@@@ # YAML-Spec examples 2.22 Timestamps
+canonical: 2001-12-15T02:59:43.1Z
+iso8601: 2001-12-14t21:59:43.10-05:00
+spaced: 2001-12-14 21:59:43.10 -5
+date: 2002-12-14
+~~~~
+{"canonical":"2001-12-15T02:59:43.1Z",
+ "iso8601": "2001-12-14t21:59:43.10-05:00",
+ "spaced": "2001-12-14 21:59:43.10 -5",
+ "date": "2002-12-14"
+}
+
+@@@@ # YAML-Spec examples 2.23 Various explicit tags <--- tags not supported by this implementation
+@@@@ # YAML-Spec examples 2.24 Global tags           <--- tags not supported by this implementation
+@@@@ # YAML-Spec examples 2.25 Unordered sets        <--- tags not supported by this implementation
+@@@@ # YAML-Spec examples 2.26 Ordered mappings      <--- tags not supported by this implementation
+
+@@@@ # YAML-Spec examples 2.27 Invoice example
+---
+invoice: 34843
+date   : 2001-01-23
+bill-to: &id001
+    given  : Chris
+    family : Dumars
+    address:
+        lines: |
+            458 Walkman Dr.
+            Suite #292
+        city    : Royal Oak
+        state   : MI
+        postal  : 48046
+ship-to: *id001
+product:
+    - sku         : BL394D
+      quantity    : 4
+      description : Basketball
+      price       : 450.00
+    - sku         : BL4438H
+      quantity    : 1
+      description : Super Hoop
+      price       : 2392.00
+tax  : 251.42
+total: 4443.52
+comments:
+    Late afternoon is best.
+    Backup contact is Nancy
+    Billsmer @ 338-4338.
+~~~~
+{"invoice":34843,"date":"2001-01-23",
+ "bill-to":{"given":"Chris",
+            "family":"Dumars",
+            "address":{"lines":"458 Walkman Dr.\nSuite #292\n","city":"Royal Oak","state":"MI","postal":48046}
+           },
+ "ship-to":{"given":"Chris",
+            "family":"Dumars",
+            "address":{"lines":"458 Walkman Dr.\nSuite #292\n","city":"Royal Oak","state":"MI","postal":48046}
+           },
+ "product":[{"sku":"BL394D","quantity":4,"description":"Basketball","price":450.00},
+            {"sku":"BL4438H","quantity":1,"description":"Super Hoop","price":2392.00}]
+ "tax":251.42,
+ "total":4443.52,
+ "comments":"Late afternoon is best. Backup contact is Nancy Billsmer @ 338-4338."
+}
+
+
+@@@@ # YAML-Spec examples 2.28 Log File example
+---
+Time: 2001-11-23 15:01:42 -5
+User: ed
+Warning:
+  This is an error message
+  for the log file
+---
+Time: 2001-11-23 15:02:31 -5
+User: ed
+Warning:
+  A slightly different error
+  message.
+---
+Date: 2001-11-23 15:03:17 -5
+User: ed
+Fatal:
+  Unknown variable "bar"
+Stack:
+  - file: TopClass.py
+    line: 23
+    code: |
+      x = MoreObject("345\n")
+  - file: MoreClass.py
+    line: 58
+    code: |-
+      foo = bar
+~~~~
+[{"Time":"2001-11-23 15:01:42 -5","User":"ed","Warning":"This is an error message for the log file"},
+ {"Time":"2001-11-23 15:02:31 -5","User":"ed","Warning":"A slightly different error message."},
+ {"Date":"2001-11-23 15:03:17 -5","User":"ed","Fatal":"Unknown variable \"bar\"","Stack":
+  [{"file":"TopClass.py","line":23,"code":"x = MoreObject(\"345\\n\")\n"},
+   {"file":"MoreClass.py","line":58,"code":"foo = bar"}
+  ]
+ }
+]
+@@@@
+
+
+---------- YAML-Spec Chapter 5: Indicators ---------
+@@@@ # YAML-Spec: Example 5.3. Block Structure Indicators
+sequence:
+- one
+- two
+mapping:
+  ? sky
+  : blue
+  sea : green
+~~~~
+!!map {
+  ? !!str "sequence"
+  : !!seq [ !!str "one", !!str "two" ],
+  ? !!str "mapping"
+  : !!map {
+    ? !!str "sky" : !!str "blue",
+    ? !!str "sea" : !!str "green",
+  },
+}
+
+
+@@@@ # YAML-Spec: Example 5.4. Flow Collection Indicators
+sequence: [ one, two, ]
+mapping: { sky: blue, sea: green }
+~~~~
+!!map {
+  ? !!str "sequence"
+  : !!seq [ !!str "one", !!str "two" ],
+  ? !!str "mapping"
+  : !!map {
+    ? !!str "sky" : !!str "blue",
+    ? !!str "sea" : !!str "green",
+  },
+}
+
+@@@@ # YAML-Spec: Example 5.5. Comment Indicator
+# Comment only.
+~~~~
+null
+
+@@@@ # YAML-Spec: Example 5.6. Node Property Indicators
+anchored: !local &anchor value
+alias: *anchor
+~~~~
+!!map {
+  ? !!str "anchored"
+  : !local &A1 "value",
+  ? !!str "alias"
+  : *A1,
+}
+
+@@@@ # YAML-Spec: Example 5.7. Block Scalar Indicators
+literal: |
+  some
+  text
+folded: >
+  some
+  text
+~~~~
+!!map {
+  ? !!str "literal"
+  : !!str "some\ntext\n",
+  ? !!str "folded"
+  : !!str "some text\n",
+}
+
+@@@@ # YAML-Spec: Example 5.8. Quoted Scalar Indicators
+single: 'text'
+double: "text"
+~~~~
+!!map {
+  ? !!str "single"
+  : !!str "text",
+  ? !!str "double"
+  : !!str "text",
+}
+
+@@@@ # YAML-Spec: Example 5.9. Directive Indicator
+%YAML 1.2
+--- text
+~~~~
+%YAML 1.2
+---
+!!str "text"
+
+@@@@ # YAML-Spec: Example 5.10. Invalid use of Reserved Indicators (this implementation *does* allow them)
+commercial-at: @text
+grave-accent: `text
+~~~~
+{"commercial-at":"@text","grave-accent":"text "}
+
+@@@@ # YAML-Spec: Example 5.11. Line Break Characters
+|
+  Line break (no glyph)
+  Line break (glyphed)↓
+~~~~
+!!str "Line break (no glyph)\n\
+      Line break (glyphed)\n"
+
+@@@@ # YAML-Spec: Example 5.12 Tabs and Spaces
+# Tabs and spaces
+quoted:·"Quoted →"
+block:→|
+··void main() {
+··→printf("Hello, world!\n");
+··}
+~~~~
+!!map {
+  ? !!str "quoted"
+  : "Quoted \t",
+  ? !!str "block"
+  : "void main() {\n\
+    \tprintf(\"Hello, world!\\n\");\n\
+    }\n",
+}
+
+@@@@ # YAML-Spec: Example 5.13. Escaped Characters
+"Fun with \\
+\" \a \b \e \f \↓
+\n \r \t \v \0 \↓
+\  \_ \N \L \P \↓
+\x41 \u0041 \U00000041"
+~~~~
+"Fun with \x5C
+\x22 \x07 \x08 \x1B \x0C
+\x0A \x0D \x09 \x0B \x00
+\x20 \xA0 \x85 \u2028 \u2029
+A A A"
+
+@@@@ # YAML-Spec: Example 5.14. Invalid Escaped Characters
+Bad escapes:
+  "\c
+  \xq-"
+~~~~
+{"error":"Unable to convert hex to integer: q- on line 4:\n  \\xq-\"\n   ^"}
+
+@@@@ # YAML-Spec: Example 5.14. Invalid Escaped Characters (this implementation allows)
+Bad escapes:
+  "\c \e"
+~~~~
+{"Bad escapes":"\\c \e"}
+@@@@
+
+---------- YAML-Spec Chapter 6 ---------
+@@@@ # YAML-Spec: Example 6.1 Indentation Spaces
+··# Leading comment line spaces are
+···# neither content nor indentation.
+····
+Not indented:
+·By one space: |
+····By four
+······spaces
+·Flow style: [    # Leading spaces
+···By two,        # in flow style
+··Also by two,    # are neither
+··→Still by two   # content nor
+····]             # indentation.
+~~~~
+!!map {
+  ? !!str "Not indented"
+  : !!map {
+      ? !!str "By one space"
+      : !!str "By four\n  spaces\n",
+      ? !!str "Flow style"
+      : !!seq [
+          !!str "By two",
+          !!str "Also by two",
+          !!str "Still by two",
+        ]
+    }
+}
+
+@@@@ # YAML-Spec: Example 6.2. Indentation Indicators
+?·a
+:·-→b
+··-··-→c
+·····-·d
+~~~~
+!!map {
+  ? !!str "a"
+  : !!seq [
+    !!str "b",
+    !!seq [ !!str "c", !!str "d" ]
+  ],
+}
+
+@@@@ # YAML-Spec: Example 6.3. Separation Spaces
+-·foo:→·bar
+- -·baz
+  -→baz
+~~~~
+!!seq [
+  !!map {
+    ? !!str "foo" : !!str "bar",
+  },
+  !!seq [ !!str "baz", !!str "baz" ],
+]
+
+@@@@ # YAML-Spec: Example 6.4. Line Prefixes
+plain: text
+··lines
+quoted: "text
+··→lines"
+block: |
+··text
+···→lines
+~~~~
+!!map {
+  ? !!str "plain"
+  : !!str "text lines",
+  ? !!str "quoted"
+  : !!str "text lines",
+  ? !!str "block"
+  : !!str "text\n·→lines\n",
+}
+
+@@@@ # YAML-Spec: Example 6.5. Empty Lines
+Folding:
+  "Empty line
+···→
+  as a line feed"
+Chomping: |
+  Clipped empty lines
+·
+~~~~
+!!map {
+  ? !!str "Folding"
+  : !!str "Empty line\nas a line feed",
+  ? !!str "Chomping"
+  : !!str "Clipped empty lines\n",
+}
+
+@@@@ # YAML-Spec: Example 6.6. Line Folding
+>-
+  trimmed↓
+··↓
+·↓
+↓
+  as↓
+  space
+~~~~
+!!str "trimmed\n\n\nas space"
+
+@@@@ # YAML-Spec: Example 6.7. Block Folding
+>
+··foo·↓
+·↓
+··→·bar↓
+↓
+··baz↓
+~~~~
+%YAML 1.2
+--- !!str
+"foo \n\n\t bar\n\nbaz\n"
+
+@@@@ # YAML-Spec: Example 6.8. Flow Folding
+"↓
+··foo·↓
+·↓
+··→·bar↓
+↓
+··baz↓
+"
+~~~~
+%YAML 1.2
+--- !!str
+" foo\nbar\nbaz "
+
+@@@@ # YAML-Spec: Example 6.9. Separated Comment
+key:····# Comment↓
+  value~~~~
+!!map {
+  ? !!str "key"
+  : !!str "value",
+}
+
+@@@@ # YAML-Spec: Example 6.10. Comment Lines
+··# Comment↓
+···↓
+↓
+~~~~
+null
+
+@@@@ # YAML-Spec: Example 6.11. Multi-Line Comments
+key:····# Comment↓
+········# lines↓
+  value↓
+↓
+~~~~
+!!map {
+  ? !!str "key"
+  : !!str "value",
+}
+
+@@@@ # YAML-Spec: Example 6.12. Separation Spaces (altered here because this implementation only allows string keys)
+"Sammy·Sosa":↓
+# Statistics:
+··hr:··# Home runs
+·····65
+··avg:·# Average
+···0.278
+~~~~
+!!map {
+  ? !!str "Sammy Sosa"
+  : !!map {
+    ? !!str "hr"
+    : !!int "65",
+    ? !!str "avg"
+    : !!float "0.278",
+  },
+}
+
+@@@@ # YAML-Spec: Example 6.13 until 6.22 because this implementation does not support directives
+@@@@ # YAML-Spec:
+~~~~
+
+@@@@ # YAML-Spec: Example 6.23. Node Properties
+!!str &a1 "foo":
+  !!str bar
+&a2 baz : *a1
+~~~~
+!!map {
+  ? &B1 !!str "foo"
+  : !!str "bar",
+  ? !!str "baz"
+  : *B1,
+}
+
+@@@@ # YAML-Spec: Example 6.24. Verbatim Tags (this implementation only supports local tags)
+!<tag:yaml.org,2002:str> foo :
+  !<!bar> baz
+~~~~
+{"error":"Non-local tags not supported by this implementation: <tag:yaml.org,2002:str> on line 2:\n!<tag:yaml.org,2002:str> foo :\n                        ^"}
+
+@@@@ # YAML-Spec: Example 6.25. Invalid Verbatim Tags
+@@@@ # YAML-Spec: Example 6.26. Tag Shorthands
+@@@@ # YAML-Spec: Example 6.27. Invalid Tag Shorthands
+~~~~
+
+@@@@ # YAML-Spec: Example 6.28. Non-Specific Tags
+# Assuming conventional resolution:
+- "12"
+- 12
+- ! 12
+~~~~
+["12",12,12]
+@@@@
+
+---------- YAML-Spec Chapter 7: Keys and value ---------
+@@@@ # YAML-Spec: Example 7.1. Alias Nodes
+First occurrence: &anchor Foo
+Second occurrence: *anchor
+Override anchor: &anchor Bar
+Reuse anchor: *anchor
+~~~~
+!!map {
+  ? !!str "First occurrence"
+  : &A !!str "Foo",
+  ? !!str "Second occurrence"
+  : *A,
+  ? !!str "Override anchor"
+  : &B !!str "Bar",
+  ? !!str "Reuse anchor"
+  : *B,
+}
+
+@@@@ # YAML-Spec: Example 7.2. Empty Content (ADAPTED: tag null values)
+{
+  foo : !!str null,
+  !!str null: bar,
+}
+~~~~
+!!map {
+  ? !!str "foo" : !!str "",
+  ? !!str ""    : !!str "bar",
+}
+
+@@@@ # YAML-Spec: Example 7.3. Completely Empty Flow Nodes
+{
+  ? foo :°,
+  °: bar,
+}
+~~~~
+!!map {
+  ? !!str "foo" : !!null "",
+  ? !!null ""   : !!str "bar",
+}
+
+@@@@ # YAML-Spec: Example 7.4. Double Quoted Implicit Keys
+"implicit block key" : [
+  "implicit flow key" : value,
+ ]
+~~~~
+!!map {
+  ? !!str "implicit block key"
+  : !!seq [
+    !!map {
+      ? !!str "implicit flow key"
+      : !!str "value",
+    }
+  ]
+}
+
+@@@@ # YAML-Spec: Example 7.5. Double Quoted Line Breaks
+"folded·↓
+to a space,→↓
+·↓
+to a line feed, or·→\↓
+·\·→non-content"
+~~~~
+!!str "folded to a space,\n\
+      to a line feed, \
+      or \t \tnon-content"
+
+@@@@ # YAML-Spec: Example 7.6. Double Quoted Lines
+"·1st non-empty↓
+↓
+·2nd non-empty·
+→3rd non-empty·"
+~~~~
+!!str " 1st non-empty\n\
+      2nd non-empty \
+      3rd non-empty "
+
+@@@@ # YAML-Spec: Example 7.7. Single Quoted Characters
+ 'here''s to "quotes"'
+~~~~
+!!str "here's to \"quotes\""
+
+@@@@ # YAML-Spec: Example 7.8. Single Quoted Implicit Keys
+'implicit block key' : [
+  'implicit flow key' : value,
+ ]
+~~~~
+!!map {
+  ? !!str "implicit block key"
+  : !!seq [
+    !!map {
+      ? !!str "implicit flow key"
+      : !!str "value",
+    }
+  ]
+}
+
+@@@@ # YAML-Spec: Example 7.9. Single Quoted Lines
+'·1st non-empty↓
+↓
+·2nd non-empty·
+→3rd non-empty·'
+~~~~
+!!str " 1st non-empty\n\
+      2nd non-empty \
+      3rd non-empty "
+
+@@@@ # YAML-Spec: Example 7.10. Plain Characters
+# Outside flow collection:
+- ::vector
+- ": - ()"
+- Up, up, and away!
+- -123
+- http://example.com/foo#bar
+# Inside flow collection:
+- [ ::vector,
+  ": - ()",
+  "Up, up and away!",
+  -123,
+  http://example.com/foo#bar ]
+~~~~
+!!seq [
+  !!str "::vector",
+  !!str ": - ()",
+  !!str "Up, up, and away!",
+  !!int "-123",
+  !!str "http://example.com/foo#bar",
+  !!seq [
+    !!str "::vector",
+    !!str ": - ()",
+    !!str "Up, up and away!",
+    !!int "-123",
+    !!str "http://example.com/foo#bar",
+  ],
+]
+
+@@@@ # YAML-Spec: Example 7.11. Plain Implicit Keys
+implicit block key : [
+  implicit flow key : value,
+ ]
+~~~~
+!!map {
+  ? !!str "implicit block key"
+  : !!seq [
+    !!map {
+      ? !!str "implicit flow key"
+      : !!str "value",
+    }
+  ]
+}
+
+@@@@ # YAML-Spec: Example 7.12. Plain Lines
+1st non-empty↓
+↓
+·2nd non-empty·
+→3rd non-empty
+~~~~
+%YAML 1.2
+---
+!!str "1st non-empty\n\
+      2nd non-empty \
+      3rd non-empty"
+
+@@@@ # YAML-Spec: Example 7.13. Flow Sequence
+- [ one, two, ]
+- [three ,four]
+~~~~
+%YAML 1.2
+---
+!!seq [
+  !!seq [
+    !!str "one",
+    !!str "two",
+  ],
+  !!seq [
+    !!str "three",
+    !!str "four",
+  ],
+]
+
+@@@@ # YAML-Spec: Example 7.14. Flow Sequence Entries
+[
+"double
+ quoted", 'single
+           quoted',
+plain
+ text, [ nested ],
+single: pair,
+]
+~~~~
+%YAML 1.2
+---
+!!seq [
+  !!str "double quoted",
+  !!str "single quoted",
+  !!str "plain text",
+  !!seq [
+    !!str "nested",
+  ],
+  !!map {
+    ? !!str "single"
+    : !!str "pair",
+  },
+]
+
+@@@@ # YAML-Spec: Example 7.15. Flow Mappings
+- { one : two , three: four , }
+- {five: six,seven : eight}
+~~~~
+%YAML 1.2
+---
+!!seq [
+  !!map {
+    ? !!str "one"   : !!str "two",
+    ? !!str "three" : !!str "four",
+  },
+  !!map {
+    ? !!str "five"  : !!str "six",
+    ? !!str "seven" : !!str "eight",
+  },
+]
+
+@@@@ # YAML-Spec: Example 7.16. Flow Mapping Entries
+{
+? explicit: entry,
+implicit: entry,
+?°°
+}
+~~~~
+%YAML 1.2
+---
+!!map {
+  ? !!str "explicit" : !!str "entry",
+  ? !!str "implicit" : !!str "entry",
+  ? !!null "" : !!null "",
+}
+
+@@@@ # YAML-Spec: Example 7.17. Flow Mapping Separate Values
+{
+unquoted·:·"separate",
+http://foo.com,
+omitted value:°,
+°:·omitted key,
+}
+~~~~
+%YAML 1.2
+---
+!!map {
+  ? !!str "unquoted" : !!str "separate",
+  ? !!str "http://foo.com" : !!null "",
+  ? !!str "omitted value" : !!null "",
+  ? !!null "" : !!str "omitted key",
+}
+
+@@@@ # YAML-Spec: Example 7.18. Flow Mapping Adjacent Values
+{
+"adjacent":value,
+"readable":·value,
+"empty":°
+}
+~~~~
+%YAML 1.2
+---
+!!map {
+  ? !!str "adjacent" : !!str "value",
+  ? !!str "readable" : !!str "value",
+  ? !!str "empty"    : !!null "",
+}
+
+@@@@ # YAML-Spec: Example 7.19. Single Pair Flow Mappings
+[
+foo: bar
+]
+~~~~
+%YAML 1.2
+---
+!!seq [
+  !!map { ? !!str "foo" : !!str "bar" }
+]
+
+@@@@ # YAML-Spec: Example 7.20. Single Pair Explicit Entry
+[
+? foo
+ bar : baz
+]
+~~~~
+%YAML 1.2
+---
+!!seq [
+  !!map {
+    ? !!str "foo bar"
+    : !!str "baz",
+  },
+]
+
+@@@@ # YAML-Spec: Example 7.21. Single Pair Implicit Entries
+- [ YAML·: separate ]
+- [ °: empty key entry ]
+- [ {JSON: like}: adjacent ]
+~~~~
+%YAML 1.2
+---
+!!seq [
+  !!seq [
+    !!map {
+      ? !!str "YAML"
+      : !!str "separate"
+    },
+  ],
+  !!seq [
+    !!map {
+      ? !!null ""
+      : !!str "empty key entry"
+    },
+  ],
+  !!seq [
+    !!map {
+      ? !!map {
+        ? !!str "JSON"
+        : !!str "like"
+      } : "adjacent",
+    },
+  ],
+]
+
+@@@@ # YAML-Spec: Example 7.22. Invalid Implicit Keys (this implementation allows any key length)
+[ foo
+ bar: invalid,
+ "foo...>1K characters...bar": invalid ]
+~~~~
+{ "error" : "Unexpected token in list: SCALAR on line 3:\n bar: invalid,\n    ^" }
+@@@@
+ERROR:
+- The foo bar key spans multiple lines
+- The foo...bar key is too long
+
+@@@@ # YAML-Spec: Example 7.23. Flow Content
+- [ a, b ]
+- { a: b }
+- "a"
+- 'b'
+- c
+~~~~
+%YAML 1.2
+---
+!!seq [
+  !!seq [ !!str "a", !!str "b" ],
+  !!map { ? !!str "a" : !!str "b" },
+  !!str "a",
+  !!str "b",
+  !!str "c",
+]
+
+@@@@ # YAML-Spec: Example 7.24. Flow Nodes
+- !!str "a"
+- 'b'
+- &anchor "c"
+- *anchor
+- !!str°
+~~~~
+%YAML 1.2
+---
+!!seq [
+  !!str "a",
+  !!str "b",
+  &A !!str "c",
+  *A,
+  !!str "",
+]
+@@@@
+
+---------- YAML-Spec Chapter 8: Block scalars ---------
+@@@@ # YAML-Spec: Example 8.1. Block Scalar Header
+- | # Empty header↓
+ literal
+- >1 # Indentation indicator↓
+ ·folded
+- |+ # Chomping indicator↓
+ keep
+
+- >1- # Both indicators↓
+ ·strip
+~~~~
+%YAML 1.2
+---
+!!seq [
+  !!str "literal\n",
+  !!str "·folded\n",
+  !!str "keep\n\n",
+  !!str "·strip",
+]
+
+@@@@ # YAML-Spec: Example 8.2. Block Indentation Indicator
+- |°
+·detected
+- >°
+·
+··
+··# detected
+- |1
+··explicit
+- >°
+·→
+·detected
+~~~~
+%YAML 1.2
+---
+!!seq [
+  !!str "detected\n",
+  !!str "\n\n# detected\n",
+  !!str "·explicit\n",
+  !!str "\t·detected\n",
+]
+
+@@@@ # YAML-Spec: Example 8.3.1. Invalid Block Scalar Indentation Indicators
+- |
+··
+·text
+- next
+~~~~
+[ " \ntext\n", "next" ] # this implementation accepts a longer leading all-space line
+
+@@@@ # YAML-Spec: Example 8.3.2. Invalid Block Scalar Indentation Indicators
+- previous
+- >
+··text
+·text
+- next
+~~~~
+{ "error": "Illegal token: SCALAR on line 6:\n- next\n^" }
+# A following text line must not be less indented.
+
+@@@@ # YAML-Spec: Example 8.3.3. Invalid Block Scalar Indentation Indicators
+- previous
+- |2
+·text
+~~~~
+{ "error": "Illegal token: SCALAR on line 5:\n\n^" }
+# The text is less indented than the indicated level.
+
+@@@@ # YAML-Spec: Example 8.4. Chomping Final Line Break
+strip: |-
+  text↓
+clip: |
+  text↓
+keep: |+
+  text↓
+~~~~
+%YAML 1.2
+---
+!!map {
+  ? !!str "strip"
+  : !!str "text",
+  ? !!str "clip"
+  : !!str "text\n",
+  ? !!str "keep"
+  : !!str "text\n",
+}
+
+@@@@ # YAML-Spec: Example 8.5. Chomping Trailing Lines
+ # Strip
+  # Comments:
+strip: |-
+  # text↓
+··⇓
+·# Clip
+··# comments:
+↓
+clip: |
+  # text↓
+·↓
+·# Keep
+··# comments:
+↓
+keep: |+
+  # text↓
+↓
+·# Trail
+··# comments.
+~~~~
+%YAML 1.2
+---
+!!map {
+  ? !!str "strip"
+  : !!str "# text",
+  ? !!str "clip"
+  : !!str "# text\n",
+  ? !!str "keep"
+  : !!str "# text\n\n",
+}
+
+@@@@ # YAML-Spec: Example 8.6. Empty Scalar Chomping
+strip: >-
+↓
+clip: >
+↓
+keep: |+
+↓
+~~~~
+%YAML 1.2
+---
+!!map {
+  ? !!str "strip"
+  : !!str "",
+  ? !!str "clip"
+  : !!str "\n",
+  ? !!str "keep"
+  : !!str "\n",
+}
+
+@@@@ # YAML-Spec: Example 8.7. Literal Scalar
+|↓
+·literal↓
+·→text↓
+↓
+~~~~
+%YAML 1.2
+---
+!!str "literal\n\ttext\n"
+
+@@@@ # YAML-Spec: Example 8.8. Literal Content
+|
+·
+··
+··literal↓
+···↓
+··
+··text↓
+↓
+·# Comment
+~~~~
+%YAML 1.2
+---
+!!str "\n\nliteral\n·\n\ntext\n"
+
+@@@@ # YAML-Spec: Example 8.9. Folded Scalar
+>↓
+·folded↓
+·text↓
+↓
+~~~~
+%YAML 1.2
+---
+!!str "folded text\n"
+
+@@@@ # YAML-Spec: Example 8.10. Folded Lines
+>
+
+·folded↓
+·line↓
+↓
+·next
+·line↓
+   * bullet
+
+   * list
+   * lines
+
+·last↓
+·line↓
+
+# Comment
+~~~~
+%YAML 1.2
+---
+!!str "\n\
+      folded line\n\
+      next line\n\
+      \  * bullet\n
+      \n\
+      \  * list\n\
+      \  * lines\n\
+      \n\
+      last line\n"
+
+@@@@ # YAML-Spec: Example 8.11. More Indented Lines
+>
+
+ folded
+ line
+
+ next
+ line
+···* bullet↓
+↓
+···* list↓
+···* lines↓
+
+ last
+ line
+
+# Comment
+~~~~
+%YAML 1.2
+---
+!!str "\n\
+      folded line\n\
+      next line\n\
+      \  * bullet\n
+      \n\
+      \  * list\n\
+      \  * lines\n\
+      \n\
+      last line\n"
+
+@@@@ # YAML-Spec: Example 8.12. Empty Separation Lines
+>
+↓
+ folded
+ line↓
+↓
+ next
+ line↓
+   * bullet
+
+   * list
+   * lines↓
+↓
+ last
+ line
+
+# Comment
+~~~~
+%YAML 1.2
+---
+!!str "\n\
+      folded line\n\
+      next line\n\
+      \  * bullet\n
+      \n\
+      \  * list\n\
+      \  * lines\n\
+      \n\
+      last line\n"
+
+@@@@ # YAML-Spec: Example 8.13. Final Empty Lines
+>
+
+ folded
+ line
+
+ next
+ line
+   * bullet
+
+   * list
+   * lines
+
+ last
+ line↓
+↓
+# Comment
+~~~~
+%YAML 1.2
+---
+!!str "\n\
+      folded line\n\
+      next line\n\
+      \  * bullet\n
+      \n\
+      \  * list\n\
+      \  * lines\n\
+      \n\
+      last line\n"
+
+@@@@ # YAML-Spec: Example 8.14. Block Sequence
+block sequence:
+··- one↓
+  - two : three↓
+~~~~
+%YAML 1.2
+---
+!!map {
+  ? !!str "block sequence"
+  : !!seq [
+    !!str "one",
+    !!map {
+      ? !!str "two"
+      : !!str "three"
+    },
+  ],
+}
+
+@@@@ # YAML-Spec: Example 8.15. Block Sequence Entry Types
+-° # Empty
+- |
+ block node
+-·- one # Compact
+··- two # sequence
+- one: two # Compact mapping
+~~~~
+%YAML 1.2
+---
+!!seq [
+  !!null "",
+  !!str "block node\n",
+  !!seq [
+    !!str "one",
+    !!str "two"
+  ],
+  !!map {
+    ? !!str "one"
+    : !!str "two",
+  },
+]
+
+@@@@ # YAML-Spec: Example 8.16. Block Mappings
+block mapping:
+·key: value↓
+~~~~
+%YAML 1.2
+---
+!!map {
+  ? !!str "block mapping"
+  : !!map {
+    ? !!str "key"
+    : !!str "value",
+  },
+}
+
+@@@@ # YAML-Spec: Example 8.17. Explicit Block Mapping Entries
+? explicit key # Empty value↓°
+? |
+  block key↓
+:·- one # Explicit compact
+··- two # block value↓
+~~~~
+%YAML 1.2
+---
+!!map {
+  ? !!str "explicit key"
+  : null,                # spec says: !!str "" but I think that is wrong
+  ? !!str "block key\n"
+  : !!seq [
+    !!str "one",
+    !!str "two",
+  ],
+}
+
+@@@@ # YAML-Spec: Example 8.18. Implicit Block Mapping Entries
+plain key: in-line value
+°:° # Both empty
+"quoted key":
+- entry
+~~~~
+%YAML 1.2
+---
+!!map {
+  ? !!str "plain key"
+  : !!str "in-line value",
+  ? !!null ""
+  : !!null "",
+  ? !!str "quoted key"
+  : !!seq [ !!str "entry" ],
+}
+
+@@@@ # YAML-Spec: Example 8.19. Compact Block Mappings (skipped)
+#- sun: yellow↓
+#- ? earth: blue↓
+#  : moon: white↓
+#~~
+#%YAML 1.2
+#---
+#!!seq [
+#  !!map {
+#     !!str "sun" : !!str "yellow",
+#  },
+#  !!map {
+#    ? !!map {
+#      ? !!str "earth"
+#      : !!str "blue"
+#    },
+#    : !!map {
+#      ? !!str "moon"
+#      : !!str "white"
+#    },
+#  }
+#]
+
+@@@@ # YAML-Spec: Example 8.20. Block Node Types
+-↓
+··"flow in block"↓
+-·>
+ Block scalar↓
+-·!!map # Block collection
+  foo : bar↓
+~~~~
+%YAML 1.2
+---
+!!seq [
+  !!str "flow in block",
+  !!str "Block scalar\n",
+  !!map {
+    ? !!str "foo"
+    : !!str "bar",
+  },
+]
+
+@@@@ # YAML-Spec: Example 8.21. Block Scalar Nodes (adapted to use !!str instead of !foo)
+literal: |2
+··value
+folded:↓
+···!!str
+··>1
+·value
+~~~~
+%YAML 1.2
+---
+!!map {
+  ? !!str "literal"
+  : !!str "value\n",  # spec has no newlines here -- but that is probably an error
+  ? !!str "folded"
+  : !!str "value\n",
+}
+
+@@@@ # YAML-Spec: Example 8.22. Block Collection Nodes
+sequence: !!seq
+- entry
+- !!seq
+ - nested
+mapping: !!map
+ foo: bar
+~~~~
+%YAML 1.2
+---
+!!map {
+  ? !!str "sequence"
+  : !!seq [
+    !!str "entry",
+    !!seq [ !!str "nested" ],
+  ],
+  ? !!str "mapping"
+  : !!map {
+    ? !!str "foo" : !!str "bar",
+  },
+}
+@@@@
+
+---------- YAML-Spec Chapter 9: Documents ---------
+@@@@ # YAML-Spec: Example 9.1. Document Prefix (not supported)
+⇔# Comment
+# lines
+Document
+@~~~
+%YAML 1.2
+---
+!!str "Document"
+
+@@@@ # YAML-Spec: Example 9.2. Document Markers
+%YAML 1.2
+---
+Document
+... # Suffix
+~~~~
+%YAML 1.2
+---
+!!str "Document"
+
+@@@@ # YAML-Spec: Example 9.3. Bare Documents (ADAPTED: not a remark when in literal scalar)
+Bare
+document
+...
+# No document
+...
+|
+%!PS-Adobe-2.0 # Not the first line
+~~~~
+%YAML 1.2
+---
+!!str "Bare document"
+%YAML 1.2
+---
+!!str "%!PS-Adobe-2.0 # Not the first line\n"
+
+@@@@ # YAML-Spec: Example 9.4. Explicit Documents
+---
+{ matches
+% : 20 }
+...
+---
+# Empty
+...
+~~~~
+%YAML 1.2
+---
+!!map {
+  !!str "matches %": !!int "20"
+}
+...
+%YAML 1.2
+---
+!!null ""
+
+@@@@ # YAML-Spec: Example 9.5. Directives Documents
+%YAML 1.2
+--- |
+%!PS-Adobe-2.0
+...
+%YAML1.2
+---
+# Empty
+...
+~~~~
+%YAML 1.2
+---
+!!str "%!PS-Adobe-2.0\n"
+...
+%YAML 1.2
+---
+!!null ""
+
+@@@@ # YAML-Spec: Example 9.6. Stream
+Document
+---
+# Empty
+...
+%YAML 1.2
+---
+matches %: 20
+~~~~
+%YAML 1.2
+---
+!!str "Document"
+...
+%YAML 1.2
+---
+!!null ""
+...
+%YAML 1.2
+---
+!!map {
+  !!str "matches %": !!int "20"
+}
+@@@@
+
+
+
+>>== END

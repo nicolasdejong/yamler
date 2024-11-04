@@ -1,0 +1,226 @@
+This file contains sections of {[Config,] YAML, JSON} tuples all separated by a 4x@ characters.
+The tuple is separated by 4x~ characters. Any tuple that is not a 2- or 3-tuple is ignored (like this text).
+'·' characters will be replaced by a space, '→' replaced by tab.
+
+The YAML will be read and converted to JSON after which it is compared against the JSON part of the tuple.
+
+This file is loaded and validated by the unit-tests to check if the YAML reader is correctly implemented.
+
+The JSON is validated by the unit-test directly as code so is assumed to be correct when validating the YAML.
+
+
+Each block is separated by 4x ~ followed by type (newline or y: YAML, t=TOKENS, c=CONFIGURATION)
+except the first block which is always the yaml input.
+
+Sections between ----- title ----- can be collapsed (but IntelliJ only remembers that for local files)
+
+Example:
+
+# YAML data as input
+foo: bar
+~~~~t
+TEXT|foo; KV_SEPARATOR; TEXT|bar
+~~~~
+
+@@@@
+
+{val: |
+  'abc'
+  def
+
+
+
+  ghi
+
+foo: bar}
+~~~~t
+MAP_START;
+  SCALAR|val^1;
+  SEPARATOR_KV^4;
+  SCALAR|'abc'\ndef\n\n\n\nghi\n^6;
+  SCALAR|foo;
+  SEPARATOR_KV^3;
+  SCALAR|bar^5;
+MAP_END^8;
+END^-1;
+
+@@@@
+{"val":"abc","foo":"bar"}
+
+
+
+@@@@
+["a","b",["aa","bb",{"cc":2}],{"aaa":3,"bbb":4.56}]
+~~~~t
+LIST_START;
+  SCALAR|a^1; SEPARATOR^4;
+  SCALAR|b^5; SEPARATOR^8;
+  LIST_START^9;
+    SCALAR|aa^10; SEPARATOR^14;
+    SCALAR|bb^15; SEPARATOR^19;
+    MAP_START^20;
+      SCALAR|cc^21; SEPARATOR_KV^25; SCALAR|2^26;
+    MAP_END^27;
+  LIST_END^28; SEPARATOR^29;
+  MAP_START^30;
+    SCALAR|aaa^31; SEPARATOR_KV^36; SCALAR|3^37; SEPARATOR^38;
+    SCALAR|bbb^39; SEPARATOR_KV^44; SCALAR|4.56^45;
+  MAP_END^49;
+LIST_END^50;
+END^-1;
+
+@@@@
+{"a":1,"b":{"b1":11,"b2":22},"c":3}
+~~~~t
+MAP_START;
+  SCALAR|a^1; SEPARATOR_KV^4; SCALAR|1^5; SEPARATOR^6;
+  SCALAR|b^7; SEPARATOR_KV^10; MAP_START^11;
+    SCALAR|b1^12; SEPARATOR_KV^16; SCALAR|11^17; SEPARATOR^19;
+    SCALAR|b2^20; SEPARATOR_KV^24; SCALAR|22^25;
+  MAP_END^27;
+  SEPARATOR^28;
+  SCALAR|c^29; SEPARATOR_KV^32; SCALAR|3^33;
+MAP_END^34;
+END^-1;
+
+@@@@ # Lists
+- a
+- b
+- - aa
+  - bb
+  -
+    - aaa
+    - bbb
+  - cc
+  - - aaaa
+    - bbbb
+- c
+~~~~t
+REMARK|Lists^1;
+LIST_ITEM^0; SCALAR|a^2;
+LIST_ITEM^0; SCALAR|b^2;
+LIST_ITEM^0; LIST_ITEM^2; SCALAR|aa^4;
+LIST_ITEM^2; SCALAR|bb^4;
+LIST_ITEM^2;
+LIST_ITEM^4; SCALAR|aaa^6;
+LIST_ITEM^4; SCALAR|bbb^6;
+LIST_ITEM^2; SCALAR|cc^4;
+LIST_ITEM^2; LIST_ITEM^4; SCALAR|aaaa^6;
+LIST_ITEM^4; SCALAR|bbbb^6;
+LIST_ITEM^0; SCALAR|c^2;
+
+@@@@ # Testing basic constructs -- based on Example 7.10 of the YAML-Spec
+# Outside flow collection:
+- ::vector
+- ": - ()"
+- Up, up, and away!
+- -123
+- http://example.com/foo#bar
+# Inside flow collection:
+- [ ::vector,
+  ": - ()",
+  "Up, up and away!",
+  -123,, ,
+  http://example.com/foo#bar ]
+# reference
+- &refA text abcd
+- *refA
+~~~~t
+REMARK|Testing basic constructs -- based on Example 7.10 of the YAML-Spec^1;
+REMARK|Outside flow collection:^0;
+LIST_ITEM^0; SCALAR|::vector^2;
+LIST_ITEM^0; SCALAR|: - ()^2;
+LIST_ITEM^0; SCALAR|Up, up, and away!^2;
+LIST_ITEM^0; SCALAR|-123^2;
+LIST_ITEM^0; SCALAR|http://example.com/foo#bar^2;
+REMARK|Inside flow collection:^0;
+LIST_ITEM^0; LIST_START^2; SCALAR|::vector^4; SEPARATOR^12;
+SCALAR|: - ()^2; SEPARATOR^10;
+SCALAR|Up, up and away!^2; SEPARATOR^20;
+SCALAR|-123^2; SEPARATOR^6; SEPARATOR^7; SEPARATOR^9;
+SCALAR|http://example.com/foo#bar^2; LIST_END^29;
+REMARK|reference^0;
+LIST_ITEM^0; REF|refA^2; SCALAR|text abcd^2;
+LIST_ITEM^0; USE_REF|refA^2;
+END;
+
+@@@@ Testing nested flow/non-flow collections
+@@@@
+- a
+- b
+- flowMap: {
+    a: 1
+    b: 2
+    list:
+      - k
+      - l
+    list2:
+      - m
+      - n
+}
+~~~~t
+LIST_ITEM^0; SCALAR|a^2;
+LIST_ITEM^0; SCALAR|b^2;
+LIST_ITEM^0; SCALAR|flowMap^2; SEPARATOR_KV^9; MAP_START^11;
+  SCALAR|a^4; SEPARATOR_KV^5; SCALAR|1^7;
+  SCALAR|b^4; SEPARATOR_KV^5; SCALAR|2^7;
+  SCALAR|list^4; SEPARATOR_KV^8;
+    LIST_ITEM^6; SCALAR|k^8;
+    LIST_ITEM^6; SCALAR|l^8;
+  SCALAR|list2^4; SEPARATOR_KV^9;
+    LIST_ITEM^6; SCALAR|m^8;
+    LIST_ITEM^6; SCALAR|n^8;
+MAP_END^0;
+END^-1
+
+@@@@ multiline string scalars until indent is lower than start indent
+@@@@
+a: abcd
+
+   efgh
+
+    ijk
+~~~~t
+SCALAR|a^0; SEPARATOR_KV^1; SCALAR|abcd\nefgh\nijk^3;
+
+@@@@ Colons should be part of scalar when not followed by whitespace
+@@@@
+a: text:with:colon
+
+   more:text:with:colon
+~~~~t
+SCALAR|a^0; SEPARATOR_KV^1; SCALAR|text:with:colon\nmore:text:with:colon^3;
+
+@@@@
+debug: false
+# line remark
+spring: # also line remark
+  security: /* block remark
+    is over multiple lines */
+    user:
+      name: test-user
+~~~~t
+SCALAR|debug^0;    SEPARATOR_KV^5; SCALAR|false^7;
+REMARK|line remark;
+SCALAR|spring^0;   SEPARATOR_KV^6;  REMARK|also line remark^8;
+SCALAR|security^2; SEPARATOR_KV^10; REMARK| block remark\n    is over multiple lines ^12;
+SCALAR|user^4;     SEPARATOR_KV^8;
+SCALAR|name^6;     SEPARATOR_KV^10; SCALAR|test-user^12;
+
+@@@@ do not allow colons in unquoted keys
+@@@@
+{a:1,b:foo,c:[1,2,3]}
+~~~~c
+disallowColonsInUnquotedKeys
+~~~~t
+MAP_START;
+  SCALAR|a^1; SEPARATOR_KV^2; SCALAR|1^3; SEPARATOR^4;
+  SCALAR|b^5; SEPARATOR_KV^6; SCALAR|foo^7; SEPARATOR^10;
+  SCALAR|c^11; SEPARATOR_KV^12; LIST_START^13;
+    SCALAR|1^14; SEPARATOR^15;
+    SCALAR|2^16; SEPARATOR^17;
+    SCALAR|3^18;
+  LIST_END^19;
+MAP_END^20;
+END^-1;
+
